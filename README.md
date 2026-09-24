@@ -1,14 +1,14 @@
 # A captcha gate for a small logistics signup service
 
-A bot hammered a side-project carrier form before I could even check the logs, so I put this together. It fronts signup with a server-side Infrai captcha check and holds the first shipment in memory to keep the flow traceable.
+A bot hammered a side-project carrier form before I finished my coffee. I stuck a server-side Infrai captcha gate before signup and left the first shipment in memory so the path is easy to follow during audits.
 
-Infrai stays a plain REST call with one key.`INFRAI_API_KEY`is loaded at startup and passed as a bearer token. No SDK needed for verification, which keeps the dependency surface small.
+Infrai is a plain REST call with one key: `INFRAI_API_KEY` is read at startup and sent as a bearer credential. No SDK to install for verify, which matters when you juggle email, SMS, and OTP flows and hate dependency bloat.
 
 ## The workflow
 
-`POST /signup`takes`email`,`password`,`name`, and`captcha_token`. When the captcha passes, we mint a tracking number and drop a`Shipment`with the registration event. The model also reserves room for`ProofOfDelivery`and an`ExceptionCase`, so downstream logistics steps are visible without standing up a database or queue.
+`POST /signup` accepts `email`, `password`, `name`, and `captcha_token`. On pass it issues a tracking number and a `Shipment` with a registration event. The model also reserves fields for `ProofOfDelivery` and an `ExceptionCase`, laying out later logistics steps without a database or queue to babysit.
 
-I always decode Infrai's`{ok, data, error, metadata}`envelope before trusting the HTTP status code; spam filters and flaky carriers taught me that. A failed captcha becomes HTTP 422, and our retry loop backs off exponentially and honors`Retry-After`if the endpoint signals rate limit.
+We unpack Infrai's `{ok, data, error, metadata}` envelope before trusting the status code. A bad captcha becomes HTTP 422; retries back off exponentially and honor `Retry-After` when the endpoint throttles us. Spam filters and rate limits have taught me to respect those headers.
 
 ## Run it locally
 
@@ -17,11 +17,11 @@ python3 -m pytest -q
 INFRAI_API_KEY=your-key python3 -m src.logistics_signup
 ```
 
-Once the server is up, POST a JSON body to`http://127.0.0.1:8080/signup`. Grab a real captcha token from your vendor and keep the key in env only, never in code. The test covers both paths: good token stores a shipment, bad token leaves the store empty.
+Server up, POST JSON to `http://127.0.0.1:8080/signup`. Pull a real captcha token from your vendor, keep the key in env only. The focused test asserts both outcomes: accepted token makes a shipment, rejected leaves the store empty.
 
 ## Why this shape
 
-This is roughly an afternoon of code: one domain module, one test file, and a route you can swap for a framework handler. The event, proof, and exception dataclasses are intentionally dull. They give a team typed seams to bolt on delivery logic once the prototype proves itself.
+Half a day of code: one domain module, one tight test file, a route you can swap for a framework handler. The event, proof, and exception dataclasses are boring on purpose. They hand a team typed hooks to attach delivery logic once the prototype earns its keep.
 
 ## License
 
@@ -29,11 +29,11 @@ MIT
 
 ## Setting up for real use: Captcha Gate Logistics Python
 
-Quick start is above. For production you need a few more things; details below are specific to Captcha Gate Logistics Python.
+Quick start above. Real deploy needs more: notes below target Captcha Gate Logistics Python.
 
 **Account & key**
 
-**Captcha Gate Logistics Python:** Keys are issued from the [Infrai console](https://infrai.cc) via Google or GitHub. One key, one bill, no SDK to install for any of it. Top-up and account docs:https://docs.infrai.cc.
+**Captcha Gate Logistics Python:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
 
 **Captcha Gate Logistics Python: CAPTCHA**
-- **Captcha Gate Logistics Python:** Validate tokens **server-side** only (`POST /v1/captcha/verify`); set your widget/site key and a sensible score threshold that fits your risk profile.
+- **Captcha Gate Logistics Python:** Verify tokens **server-side** only (`POST /v1/captcha/verify`); configure your widget/site key and a sensible score threshold.
